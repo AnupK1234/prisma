@@ -127,7 +127,21 @@ async function createData() {
 
 
 
+  const mediaFormat = await prisma.mediaFormat.create({
+    data: {
+      id: 'unique-media-format-id', // Provide a unique ID for the document
+      formatID: 1, // Example FormatID
+      format: 'JPEG', // Example format
+      version: '1.0.0', // Example version
+      executeCode: 'exec_jpeg', // Example execute code
+    },
+  });
+
+  console.log('MediaFormat inserted successfully:', mediaFormat);
     
+
+  
+
 
    
   } catch (error) {

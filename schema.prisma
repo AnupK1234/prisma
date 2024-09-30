@@ -119,3 +119,847 @@ enum RecordStatus {
   ACTIVE
   INACTIVE
 }
+
+// MediaFormat is a model in Prisma.
+model MediaFormat {
+  id          String @id @map("_id") // Same ID used for both _id and id
+  formatID    Int    @map("FormatID")
+  format      String @map("Format")
+  version     String @map("Version") @default("0.0.1")
+  executeCode String @map("ExecuteCode")
+}
+
+
+model Company {
+  id                 String @id @map("_id") @default(auto()) @db.ObjectId
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  relationships      RelationshipCompanyInfo[] @relation(name: "CompanyRelationships")
+  publisherKey       String? @map("PublisherKey")
+  uniqueKey          String @map("UniqueKey")
+  name               String @unique @map("Name")
+  currency           String? @map("Currency")
+  enabled            Int @default(1) @map("Enabled")
+  hasMediaAccess     Boolean? @map("HasMediaAccess")
+  isMasterPublisher  Boolean? @map("IsMasterPublisher")
+  isReseller         Boolean? @map("IsReseller")
+  type               Int? @map("Type")
+  canDoScriptTracking Boolean? @map("CanDoScriptTracking")
+  canDoRotationalTags Boolean? @map("CanDoRotationalTags")
+  landline           String?
+  status             Int? @map("Status")
+  url                String? @map("URL")
+  email              String
+  address            GenericAddress
+  logoURL            String?
+  info               String? @map("Company Info")
+  regNum             String? @map("Company Registration Number")
+  vatNum             String? @map("Company Sales VAT Number")
+  members            CompanyMembership[] @relation(name: "CompanyMembership")
+  profiles           CompanyProfile[] @relation(name: "CompanyProfiles")
+  category           String?
+  stripeCustomerId   String?
+  stripeAccountId    String?
+  taxId              String?
+  mcc                String?
+  tos_acceptance     TosAcceptance?
+  business_type      String?
+  masterContact      CompanyMembership? @relation(name: "MasterContact")
+  billingContact     CompanyMembership? @relation(name: "BillingContact")
+  representativeContact CompanyMembership? @relation(name: "Representative")
+  directorContact    CompanyMembership? @relation(name: "Director")
+  executiveContact   CompanyMembership? @relation(name: "Executive")
+  ownersContact      CompanyMembership? @relation(name: "Owners")
+  billingEmail       String?
+  billingPhone       String?
+  contactXeroId      String?
+  billingReferral    BillingCoupon? @relation(name: "ReferralCode")
+  subscriptions      String[]
+  permittedCoupons   BillingCoupon[] @relation(name: "CouponPermittedCompany")
+  redeemedCoupons    BillingCoupon[] @relation(name: "CouponUsedCompany")
+  bankAccount        BankAccount? @relation(name: "CompanyBankAccount")
+  billingDefaultType BillingDefaultType?
+  billingPreferenceCardId String?
+  isPrepaid          Boolean?
+  relationshipRequestKey String?
+  employeeCanAccessMarketing CompanyMembership[] @relation(name: "EmployeeCanAccessMarketing")
+}
+
+
+// RelationshipCompanyInfo is a model in Prisma.
+model RelationshipCompanyInfo {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  company        Company             @relation(name: "CompanyRelationships", fields: [companyId], references: [id])
+  companyId      String              // Foreign key to Company
+  role           RelationshipCompanyRole
+  users          CompanyMembership[] @relation(name: "UserCompanyRelationships")
+  relationship   CompanyRelationship
+}
+
+// CompanyMembership is a model in Prisma.
+model CompanyMembership {
+  id                 String @id @default(auto()) @map("_id") @db.ObjectId
+  company            Company         @relation(name: "CompanyMembership")
+  email              String
+  phone              String
+  role               CompanyRole     @default(USER)
+  fenixUserGroup     UserGroup?       @relation(fields: [userGroupId], references: [id]) // Foreign key for UserGroup
+  userGroupId        String?          // Nullable foreign key for UserGroup
+
+  user               User?           @relation(name: "UserToCompanies")
+  status             Status          @default(ACTIVE)
+  landline           String?
+
+  // Used for personal and company calendars
+  eventInvitations   EventInvitation[]
+  platformEvents     PlatformEvent[]
+  calendarEvents     CalendarEvent[]
+  platformEventSlots PlatformEventSlot[]
+
+  // Employee profile
+  jobTitle           String?
+  avatar             String?
+  department         String?
+
+  profiles           EmployeeProfile[] @relation(name: "EmployeeProfiles")
+  permissions        PermissionsNew?    @relation(name: "EmployeePermissions")
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model BillingCoupon {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  name                   String
+  description            String?
+  stripeCouponId         String?
+  stripeProductIds       String[]
+  promoCode              String
+  value                  Float
+  unit                   PromoValueUnit
+  companyId              String?
+  eventId                String?
+  type                   CouponType?
+  onlyTheseCompanies     Company[]             @relation("CouponPermittedCompany")
+  onlyTheseUsers         User[]                @relation("CouponPermittedUser")
+  oneUsePerCompany       Boolean
+  oneUsePerUser          Boolean
+  couponUsage            String                @default("once")
+  isReferral             Boolean
+  startDate              DateTime
+  endDate                DateTime?
+  maximumUses            Int?
+  currentUses            Int?
+  usedByUser             User[]                @relation("CouponUsedByUser")
+  usedByCompanyMembership CompanyMembership[]  @relation("CouponUsedByCompanyMembership")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+}
+
+model BankAccount {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  stripeBankAccountId  String?
+  country              String?
+  currency             String?
+  accountHolderName    String?
+  accountHolderType    String?
+  routingNumber        String?
+  sortBsbNumber        String?
+  accountNumber        String?
+  iban                 String?
+  counterpartyId       String?
+  counterpartyAccountId String?
+}
+
+enum BillingDefaultType {
+  DEBIT_CARD
+  BANK_ACCOUNT
+}
+
+enum RelationshipCompanyRole {
+  REQUESTER
+  RECIPIENT
+}
+
+model CompanyRelationship {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  companies  RelationshipCompanyInfo[]
+  type       CompanyRelationshipType?
+  status     RelationshipStatus    @default(SENT)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+}
+
+enum CompanyRole {
+  ADMIN
+  SUPER_ADMIN
+  USER
+  MASTER_ADMIN
+}
+
+model UserGroup {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String?
+  role      String?
+  permissions PermissionsNew?
+}
+
+model User { 
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  accountStatus        Int?
+  avatar               String?
+  companyId            String?            // Changed to String for MongoDB
+  company              Company?           @relation("UserToCompany", fields: [companyId], references: [id])
+  companies            CompanyMembership[]
+  fenixUserGroupId     String?
+  fenixUserGroup       UserGroup?         @relation(fields: [fenixUserGroupId], references: [id])
+  country              String?
+  addressId            String?            // Changed to String for MongoDB
+  address              GenericAddress?    @relation("UserAddress", fields: [addressId], references: [id])
+  zip                  String?
+  dob                  DateTime?
+  email                String             @unique
+  password             String?
+  enabled              Boolean            @default(true)
+  enable               Int                @default(1)
+  phone                String?
+  lastActivity         DateTime?
+  firstName            String
+  lastName             String
+  emailVerified        Boolean            @default(false)
+  phoneVerified        Boolean            @default(false)
+  inviteUsed           Boolean            @default(false)
+  inviteCode           String?
+  facebook             String?
+  instagram            String?
+  linkedIn             String?
+  qq                   String?
+  skype                String?
+  twitter              String?
+  weChat               String?
+  weibo                String?
+  socialLine           String?
+  gender               UserGender?
+  passportNumber       String?
+  nationalSecurityNumber String?
+  secondaryProfilePic  String?
+  deliveryAddressId    String?            // Changed to String for MongoDB
+  deliveryAddress      GenericAddress?    @relation("UserDeliveryAddress", fields: [deliveryAddressId], references: [id])
+  profiles             UserProfile[]
+  permittedCoupons         BillingCoupon[]     @relation("CouponPermittedUser", fields: [permittedCouponsId], references: [id]) // Coupons the user is permitted to use
+  redeemedCoupons          BillingCoupon[]     @relation("CouponUsedByUser", fields: [id], references: [id]) // Coupons the user has redeemed
+  companyLimit         Int?
+  synkdDataSellAllowed Boolean?
+  synkdDataSellAllowedDate DateTime?
+  userProfileLockedUntil DateTime?
+  notifications        CommunityNotification[]
+  isChild              Boolean?
+  walkthroughStep      Int?
+  doNotShowWalkthrough Boolean?
+}
+
+// Status is an enum in Prisma.
+enum Status {
+  ACTIVE
+  ARCHIVED
+}
+
+// EventInvitation Model
+model EventInvitation {
+  id                        String                 @id @default(cuid())
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  eventType                 EventType
+  notificationStatus        NotificationStatus     @default(UNREAD)
+  invitationStatus          InvitationStatus       @default(AWAITING)
+  inviteeId                 String
+  invitee                   CompanyMembership      @relation(fields: [inviteeId], references: [id])
+  invitationEmail           String
+  lastInviteSent            DateTime?
+  calendarSlotId            String?
+  calendarEventId           String?
+  calendarEvent             CalendarEvent?         @relation(fields: [calendarEventId], references: [id])
+  platformEventId           String?
+  platformEvent             PlatformEvent?         @relation(fields: [platformEventId], references: [id])
+  platformEventSlotId       String?
+  platformEventSlot         PlatformEventSlot?     @relation(fields: [platformEventSlotId], references: [id])
+  platformEventPricingSlot  PlatformEventCart?     @relation("PlatformEventPricingSlotInvitation")
+}
+
+// PlatformEvent Model
+model PlatformEvent {
+  id                        String                 @id @default(cuid())
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  notificationStatus        NotificationStatus     @default(UNREAD)
+  createdByUserId           String?
+  createdByUser             User?                  @relation("EventUserCreated", fields: [createdByUserId], references: [id])
+  archiveDate               DateTime?
+  startAt                   DateTime
+  endAt                     DateTime
+  name                      String
+  name_check                Boolean
+  description               String
+  description_check         Boolean
+  location                  String
+  location_check            Boolean
+  geo                       String
+  notes                     String
+  organiserId               String
+  organiser                 CompanyMembership      @relation(fields: [organiserId], references: [id])
+  attendees                 EventInvitation[]
+  timezone                  String
+  timezone_check            Boolean
+  timezoneLocation          String
+  status                    GeneralStatus          @default(DRAFT)
+  slug                      String                 @unique
+  slotDurationMins          Int                    @default(30)
+  platformEventType         PlatformEventType      @default(REGULAR)
+  theme                     PlatformEventTheme?
+  menusOrder                PlatformEventMenuPage[]
+  menus                     PlatformEventMenuSettings[]
+  venues                    PlatformEventVenue[]
+  contents                  PlatformEventContent[]
+  language                  PlatformEventLanguage?
+  qr_code_url               String?
+  qr_code_url_check         Boolean
+  privacy                   String?
+  privacy_check             Boolean
+  legal                     String?
+  legal_check               Boolean
+  contact_us                String?
+  contact_us_check          Boolean
+  your_data                 String?
+  your_data_check           Boolean
+  logo_image_check          Boolean
+  header_image              String?
+  header_image_check        Boolean
+  left_image                String?
+  left_image_check          Boolean
+  right_image               String?
+  right_image_check         Boolean
+  attendee_preferences      EventAttendeeDataPreferenceType[]
+  company_preferences       EventCompanyDataPreferenceType[]
+  maximumAttendees          Int                    @default(20)
+  clusterId                 String?
+  cluster                   CrmCluster?            @relation("EventCluster", fields: [clusterId], references: [id])
+  customCluster             CrmCluster[]           @relation("EventClusterCustom")
+}
+
+enum CompanyRelationshipType {
+  FAMILY
+  FRIEND
+  BUSINESS
+}
+
+// CalendarEvent Model
+model CalendarEvent {
+  id                 String              @id @default(cuid()) // Equivalent to _id in MongoDB
+  calanderSlotId     String?             
+  notificationStatus NotificationStatus  @default(UNREAD)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  startAt            DateTime
+  endAt              DateTime
+  name               String?
+  description        String?
+  location           String?
+  geo                String?
+  notes              String?
+  organiserId        String
+  organiser          CompanyMembership   @relation(fields: [organiserId], references: [id])
+  attendees          EventInvitation[]
+  timezone           String?
+  status             CalendarStatus      @default(ACTIVE)
+}
+
+model PlatformEventSlot {
+  id                  String                @id
+  calendarSlotId      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  startAt             DateTime
+  endAt               DateTime
+  name                String?
+  description         String?
+  location            String?
+  geo                 String?
+  notes               String?
+  cart                PlatformEventCart?    @relation(fields: [cartId], references: [id])
+  cartId              String?
+  contentId           String?
+  organiser           CompanyMembership     @relation(fields: [organiserId], references: [id])
+  organiserId         String
+  attendees           EventInvitation[]     @relation("PlatformEventSlotAttendees")
+  timezone            String?
+  venue               PlatformEventVenue    @relation("PlatformEventSlotVenue", fields: [venueId], references: [id])
+  venueId             String
+  event               PlatformEvent         @relation("InvitationEventId", fields: [eventId], references: [id])
+  eventId             String?
+  overrideMaxAttendees Int?
+}
+
+// PermissionsNew
+model PermissionsNew {
+  id          String   @id
+  permissions Json
+
+  // Relations
+  employee    CompanyMembership @relation(name: "EmployeePermissions")
+  group       UserGroup         @relation(name: "UserGroupPermissions")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum PromoValueUnit {
+  PERCENTAGE
+  FIXED
+}
+
+enum CouponType {
+  EVENT
+  SUBSCRIPTION
+  TOPUP
+  GENERAL
+}
+
+// RelationshipStatus is an enum in Prisma.
+enum RelationshipStatus {
+  SENT
+  CONFIRMED
+}
+
+// RelationshipFamilyRole is an enum in Prisma.
+enum RelationshipFamilyRole {
+  REQUESTER
+  RECIPIENT
+}
+
+enum UserGender {
+  MALE
+  FEMALE
+  OTHER
+  NS
+}
+
+enum CommunityNotificationType {
+  NEW_SUPPORT_QUESTION
+  NEW_SUPPORT_REPLY
+  NEW_HUB_QUESTION
+  NEW_HUB_REPLY
+}
+
+model CommunityNotification {
+  id                String            @id @default(uuid())
+  type              CommunityNotificationType
+  title             String
+  targetId          String
+  receiverId        String
+  receiver          User              @relation("UserReceivedNotification", fields: [receiverId], references: [id])
+  isSeen            Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  seenAt            DateTime?
+}
+
+// Enum for EventType
+enum EventType {
+  PLATFORM_EVENT
+  PLATFORM_EVENT_SLOT
+  PLATFORM_EVENT_PRICING_SLOT
+  CALENDAR_EVENT
+}
+
+// Enum for InvitationStatus
+enum InvitationStatus {
+  AWAITING
+  ACCEPTED
+  DECLINED
+  ARCHIVED
+  EXPIRED
+}
+
+// Enum for NotificationStatus
+enum NotificationStatus {
+  READ
+  UNREAD
+  ARCHIVED
+}
+
+model PlatformEventCart {
+  id                   String                @id
+  item                 String
+  calendarSlotId       String?
+  pricing              PlatformEventContentPricing @relation(fields: [pricingId], references: [id])
+  pricingId            String
+  currentPrice         Float?
+  currentCurrency      String?
+  quantity             Int
+  type                 String
+  event                PlatformEvent          @relation(fields: [eventId], references: [id])
+  eventId              String
+  user                 User                   @relation(fields: [userId], references: [id])
+  userId               String
+  userCompanyMembership CompanyMembership?    @relation("UserCompanyMembership", fields: [userCompanyMembershipId], references: [id])
+  userCompanyMembershipId String?
+  employeeActionBy     CompanyMembership?     @relation("EmployeeActor", fields: [employeeActionById], references: [id])
+  employeeActionById   String?
+  qrcodeKey            String?
+  qrcodeImage          String?
+  paymentIntentId      String?
+  checkoutSessionId    String?
+  xeroId               String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  status               CartStatus
+  startAt              DateTime?
+  endAt                DateTime?
+  rating               Int?
+  invitation           EventInvitation[]      @relation("PlatformEventPricingSlotInvitation")
+}
+
+enum GeneralStatus {
+  DRAFT
+  LIVE
+  ARCHIVED
+}
+
+// Enum for PlatformEventType
+enum PlatformEventType {
+  REGULAR
+  TRADE
+  RESTAURANT
+  SALON
+  MEETINGROOMS
+  GATHERING
+  EXHIBITION
+  BIRTHDAY
+  MECHANIC
+  PHOTOGRAPHY
+  CINEMA
+  MUSEUM
+  CONFERENCES
+  WEDDINGS
+  TENNIS
+  BASKETBALL
+  FOOTBALL
+  SQUASH
+  GARAGE
+  RUGBY
+  AFL
+  SPORT
+  NFL
+  SURGERY
+  DENTIST
+}
+
+// Model for PlatformEventTheme
+model PlatformEventTheme {
+  id                         String  @id @default(auto()) @map("_id") // Use an auto-generated ID for MongoDB
+  logoURL                    String?
+  primaryColour              String?
+  primaryTextColour          String?
+  secondaryColour            String?
+  secondaryTextColour        String?
+  calendarPrimaryColour      String?
+  calendarPrimaryTextColour   String?
+  calendarSecondaryColour    String?
+  calendarSecondaryTextColour String?
+}
+
+// Enum for PlatformEventMenuPage
+enum PlatformEventMenuPage {
+  HOME
+  CALENDAR
+  CONTENT
+  CONTENT_CUSTOM
+  COMPANIES
+  ATTENDEES
+  CONTENT_PRICING
+  CLUSTER
+  ADMIN
+}
+
+// Model for PlatformEventMenuSettings
+model PlatformEventMenuSettings {
+  id           String                    @id @default(auto()) @map("_id")
+  label        String                    
+  type         PlatformEventMenuPage    
+  parameter    String?
+  link         String?
+  showToAll    Boolean                   @default(false)
+  show         Boolean                    @default(true)
+  adminOnly    Boolean                    @default(false)
+  userVisible   User[]                  @relation("UserVisible")
+  userAdmin     User[]                  @relation("UserAdmin")
+}
+
+model PlatformEventVenue {
+  id                 String            @id
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  platformEvent      PlatformEvent     @relation(fields: [platformEventId], references: [id])
+  platformEventId    String
+  name               String
+  maxAttendees       Int
+  status             Status?           @default(ACTIVE)
+  type               EventVenueType    @default(GENERIC)
+  link               String?
+  platformEventSlots PlatformEventSlot[] @relation("PlatformEventSlotVenue")
+}
+
+// Model for PlatformEventContent
+model PlatformEventContent {
+  id                String                     @id @default(auto()) @map("_id")
+  name              String?
+  contentStatus     String?
+  body              String?
+  imageURL          String?
+  linkURL           String?
+  keywords          String[]
+  subContentType    String?                   @default("content")
+  pricingType       PricingContentType        @default(MULTIPLE)
+  pricing           PlatformEventContentPricing[] @relation("ContentPricingEmployee")
+  pricingMaster     PlatformEventContentPricing? @relation("ContentPricingMaster")
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  startDate         DateTime
+  endDate           DateTime
+  images            String[]
+  links             ContentLink[]             // Assuming ContentLink is defined elsewhere
+  isCartAvailable    Boolean?
+  isVenueChecked    Boolean?
+  isScheduleAvailable Boolean?
+  isPricingAvailable Boolean?
+  selectedVenue     String?
+  isConstraintAvailable Boolean?
+}
+
+// Enum for PlatformEventLanguage
+enum PlatformEventLanguage {
+  ENGLISH
+  CHINESE
+  FRENCH
+}
+
+// Enum for EventAttendeeDataPreferenceType
+enum EventAttendeeDataPreferenceType {
+  PROFILE_PICTURE
+  NAME
+  PROFILE
+  KEYWORDS
+  WEBSITE
+  EMAIL
+  MOBILE
+  GENDER
+  DATE_OF_BIRTH
+  ADDRESS
+  ZIPCODE
+  COUNTRY
+  RATING
+}
+
+// Enum for EventCompanyDataPreferenceType
+enum EventCompanyDataPreferenceType {
+  LOGO
+  NAME
+  PROFILE
+  KEYWORDS
+  IMAGES
+  WEBSITE
+  EMAIL
+  LANDLINE
+  CATEGORY
+  ADDRESS
+  ZIPCODE
+  COUNTRY
+  RATING
+}
+
+model CrmCluster {
+  id                  String   @id @map("_id")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  createdByUserId     String?
+  createdByUser       User?    @relation("ClusterUserCreated", fields: [createdByUserId], references: [id])
+  archiveDate         DateTime?
+  name                String
+  description         String
+  clusterType         CrmClusterType
+  companyId           String?
+  company             Company? @relation(fields: [companyId], references: [id])
+  users               CrmUser[]
+  crmQuestionId       String?
+  crmQuestion         CrmQuestion? @relation("CrmClusterToQuestion", fields: [crmQuestionId], references: [id])
+  subClusters         CrmSubCluster[]
+  status              Status @default(ACTIVE)
+}
+
+model CrmSubCluster {
+  id                  String   @id @map("_id")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  name                String
+  description         String
+  clusterType         CrmClusterType
+  crmOptionId         String?
+  crmOption           CrmQuestionOption? @relation("CrmSubClusterToOption", fields: [crmOptionId], references: [id])
+  parentClusterId     String
+  parentCluster       CrmCluster @relation("CrmSubClusters", fields: [parentClusterId], references: [id])
+  users               CrmUser[]
+}
+
+model CrmCompany {
+  id                  String           @id @default(auto()) @map("_id") // Auto-generated ID for MongoDB
+  email               String?
+  profiles            CompanyProfile[]  // Define relation with CompanyProfile without INLINE
+  address             GenericAddress?   // Define relation with GenericAddress without INLINE
+  category            String?
+
+  em_email            String?
+  em_profiles         EmployeeProfile[] // Define relation with EmployeeProfile without INLINE
+  em_jobTitle         String?
+}
+
+model CrmUser {
+  id                  String      @id @map("_id")
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  notificationStatus  NotificationStatus @default(UNREAD)
+  associatedCompanyId String
+  associatedCompany   Company     @relation("CrmUserToCompany", fields: [associatedCompanyId], references: [id])
+  userId              String?
+  user                User?       @relation("CrmUserToUser", fields: [userId], references: [id])
+  firstName           String?
+  lastName            String?
+  email               String?
+  emailList           String[]
+  phone               String?
+  gender              String?
+  address             GenericAddress?
+  dob                 DateTime?
+  otherData           Json?
+  status              CrmUserStatus @default(SUBSCRIBED)
+  companies           CrmCompany[]
+}
+
+// Enum for Calendar Status
+enum CalendarStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// Model for PlatformEventContentPricing
+model PlatformEventContentPricing {
+  id                  String           @id @default(auto()) @map("_id")
+  user_type           PricingUserType   @default(EMPLOYEE)
+  calendarSlotId      String?
+  employee            CompanyMembership[] @relation("PricingEmployee")
+  user                User[]            @relation("PricingUser")
+  currency            String?
+  price               Float?
+  duration            Int?
+  slots               Int?
+  tax                 Int?
+  remaining_slots     Int?
+  booked_slots        Int?              @default(0)
+  availability_weeks  String[]
+  availability_hours  String[]
+  show_rating         Boolean?
+}
+
+enum CartStatus {
+  PENDING
+  PAYMENT_VERIFICATION
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  APPROVED
+  REJECTED
+  PROCESSED
+  COMPLETE
+  ARCHIVED
+}
+
+enum EventVenueType {
+  GENERIC
+  ONLINE
+  ROOM
+  HALL
+  SEAT
+  TABLE
+  SLOT
+  COURT
+  BERTH
+  THEATRE
+  PITCH
+}
+
+enum PricingContentType {
+  SINGLE
+  MULTIPLE
+}
+
+model ContentLink {
+  id    String @id @default(auto()) @map("_id") // Use an auto-generated ID for MongoDB
+  name  String 
+  link  String
+}
+
+enum CrmClusterType {
+  AUTOMATED
+  MANUAL
+  EVENT
+  CUSTOMERS
+  AUTOMATED_EVENT
+}
+
+enum CrmUserStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+model CrmQuestion {
+  id                  String     @id @map("_id")
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  createdByUserId     String?
+  createdByUser       User?      @relation("CrmQuestionUserCreated", fields: [createdByUserId], references: [id])
+  archiveDate         DateTime?
+  companyId           String
+  company             Company    @relation("CrmQuestionToCompany", fields: [companyId], references: [id])
+  questionShortText   String
+  questionDescription String?
+  status              GeneralStatus @default(DRAFT)
+  type                ClusterType  @default(STRATEGY)
+  minimumSelections   Int          @default(1)
+  maximumSelections   Int          @default(1)
+  options             CrmQuestionOption[]
+  crmClusterId        String?
+  crmCluster          CrmCluster? @relation("CrmClusterToQuestion", fields: [crmClusterId], references: [id])
+}
+
+model CrmQuestionOption {
+  id                  String     @id @map("_id")
+  questionId          String
+  question            CrmQuestion @relation("CrmQuestionOption", fields: [questionId], references: [id])
+  optionShortText     String
+  optionDescription   String?
+
+  crmSubClusterId     String?
+  crmSubCluster       CrmSubCluster? @relation("CrmSubClusterToOption", fields: [crmSubClusterId], references: [id])
+}
+
+enum PricingUserType {
+  EMPLOYEE
+  USER
+}
+
+enum ClusterType {
+  STRATEGY
+  EVENT
+}
