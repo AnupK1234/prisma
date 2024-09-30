@@ -59,3 +59,63 @@ model Service {
   updatedAt DateTime @updatedAt
 }
 
+model MediaRates {
+  id                     String      @id @map("_id") @default(auto()) @db.ObjectId
+  averageDailyUniqueReach Int?        @map("AverageDailyUniqueReach")
+  averageDailyFrequency   Int?        @map("AverageDailyFrequency")
+  country                 String?     @map("Country")
+  zone                    String?     @map("Zone")
+  vertical                String?     @map("Vertical")
+  pricingModel            String?     @map("PricingModel")
+  averageVolume           Int?        @map("AverageVolume")
+  format                  String?     @map("Format")
+  formatSize              String?     @map("FormatSize")
+  device                  String?     @map("Device")
+  placement               String?     @map("Placement")
+  currency                String?     @map("Currency")
+  publisherRate           Float?      @map("PublisherRate")
+  initialPubRate          Float?      @map("InitialPubRate")
+  publisherFee            Float?      @map("PublisherFee")
+  clientRate              Float?      @map("ClientRate")
+
+  // Specify the relation fields and references here
+  publisherSiteId         String
+  publisherSite           PublisherSite @relation(name: "PublisherSiteMediaRates", fields: [publisherSiteId], references: [id])
+}
+
+model PublisherSite {
+  id                   String            @id @map("_id") @default(auto()) @db.ObjectId
+  company              Int               @map("Company")
+  name                 String            @unique @map("Name")
+  zones                String[]          @map("Zones")
+  countries            String[]          @map("Countries")
+  publisherCountry     String?           @map("PublisherCountry")
+  vertical             String?           @map("Vertical")
+
+  // Define the relation field with PublisherDevices
+  deviceId             String?
+  Devices              PublisherDevices? @relation(fields: [deviceId], references: [id])
+
+  mediaRates           MediaRates[]      @relation(name: "PublisherSiteMediaRates")
+  displayInSiteList    Boolean
+  status               RecordStatus      @default(ACTIVE)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  archiveDate          DateTime?
+  studio               Boolean?          @map("Studio")
+}
+
+model PublisherDevices {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  desktop  Boolean
+  mobile   Boolean
+  tablet   Boolean
+
+  // Add an opposite relation back to PublisherSite
+  PublisherSite PublisherSite[]
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}

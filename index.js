@@ -7,20 +7,20 @@ const prisma = new PrismaClient();
 // Function to create data in GenericAddress and CompanyProfile models
 async function createData() {
   try {
-    // const newAddress = await prisma.genericAddress.create({
-    //   data: {
-    //     country: 'USA',
-    //     postcode: '12345',
-    //     town: 'Smalltown',
-    //     city: 'Metropolis',
-    //     state: 'New York',
-    //     address: '123 Main St',
-    //     addressTwo: 'Apt 4B',
-    //   },
-    // });
+    const newAddress = await prisma.genericAddress.create({
+      data: {
+        country: 'USA',
+        postcode: '12345',
+        town: 'Smalltown',
+        city: 'Metropolis',
+        state: 'New York',
+        address: '123 Main St',
+        addressTwo: 'Apt 4B',
+      },
+    });
 
-    // // Log the new address
-    // console.log('New Address Created:', newAddress);
+    // Log the new address
+    console.log('New Address Created:', newAddress);
 
     // Insert data into CompanyProfile
     const newCompanyProfile = await prisma.companyProfile.create({
@@ -72,6 +72,58 @@ async function createData() {
       },
     });
     console.log('New Service Created:', newService);
+
+
+
+    // Insert into PublisherDevices
+  const publisherDevices = await prisma.publisherDevices.create({
+    data: {
+      desktop: true,
+      mobile: true,
+      tablet: false,
+    },
+  });
+
+  // Insert into PublisherSite
+  const publisherSite = await prisma.publisherSite.create({
+    data: {
+      company: 12345,
+      name: 'Awesome Publisher',
+      zones: ['Zone1', 'Zone2'],
+      countries: ['US', 'UK'],
+      publisherCountry: 'US',
+      vertical: 'Technology',
+      deviceId: publisherDevices.id, // Connect PublisherDevices via ID
+      displayInSiteList: true,
+      status: 'ACTIVE',
+      studio: false,
+    },
+  });
+
+  // Insert into MediaRates
+  const mediaRates = await prisma.mediaRates.create({
+    data: {
+      averageDailyUniqueReach: 5000,
+      averageDailyFrequency: 3,
+      country: 'US',
+      zone: 'Zone1',
+      vertical: 'Technology',
+      pricingModel: 'CPM',
+      averageVolume: 1000,
+      format: 'Banner',
+      formatSize: '300x250',
+      device: 'Desktop',
+      placement: 'Top',
+      currency: 'USD',
+      publisherRate: 20.5,
+      initialPubRate: 18.0,
+      publisherFee: 2.5,
+      clientRate: 22.5,
+      publisherSiteId: publisherSite.id, // Connect PublisherSite via ID
+    },
+  });
+
+  console.log('Data inserted successfully:', { publisherDevices, publisherSite, mediaRates });
 
 
 
