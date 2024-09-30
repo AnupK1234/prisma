@@ -1,0 +1,2028 @@
+# Author: Rishabh Jindal
+# Email: rishabh@byinspired.com
+# License: Copyright, Inspired Mobile Ltd 2020
+
+# -------------------------------- GENERAL NOTES --------------------------------------------
+# 1. There are certain changes to the database to make it backwards/forwards compatible:
+# - a) some _id in the old db structure are in int or string format. Moving forward, 
+# we want any new collection to follow MongoDB objectID format for _id. For forward compatibility,
+# the old collections have a new field `id` with MongoDB objectID.
+#
+# - b) related to a), old ID references (for example, company -> user relation) reference int/string
+# to make it forward compatible, you will see another lowercase field with the same name in the db
+# with MongoDB ID format. Below, the old fields follow a deprecated syntax _existingName and new
+# fields follow existingName
+
+# Most of the other relationships should be clear from the code below. If something is unclear,
+# please take a look at the prisma documentation -> https://prisma.io
+#
+# ------------------------------------------------------------------------------------------
+
+
+# ------------------------------ NAMING CONVENTIONS -----------------------------------------
+# Collection name should be PascalCase
+# Field names should be camelCase
+# For legacy storage in the db, override name with @db(name:"INSERT_NAME_HERE") decorator
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------- !IMPORTANT - BACKWARDS COMPATIBILITY ---------------------
+#
+# Our prisma instance is a custom instance (Not the same image as official prisma) because the
+# official instance restricts `_id`to be ObjectID. To circumvent, I've replaced the required field
+# to be `id` instead. MAKE SURE ALL YOUR COLLECTIONS HAVE AN `id` field. If `_id` is ObjectID, please
+# define `id` to be manually populated and copy over the same ObjectID as `_id`
+# -------------------------------------------------------------------------------------------
+
+# ------------------------------ TYPE DEFINITIONS START -------------------------------------
+
+type GenericAddress @embedded {
+  country: String
+  postcode: String
+  town: String
+  city: String
+  state: String
+  address: String
+  addressTwo: String
+}
+
+type CompanyProfile @embedded {
+  locale: String!
+  keywords: [String!]
+  categorisedKeywords: [String!]
+  bio: String!
+}
+
+type EmployeeProfile @embedded {
+  locale: String!
+  keywords: [String!]
+  categorisedKeywords: [String!]
+  bio: String!
+}
+
+type UserProfile @embedded {
+  locale: String!
+  keywords: [String!]
+  categorisedKeywords: [String!]
+  bio: String!
+}
+
+type TosAcceptance @embedded {
+  ip: String
+  date: Int
+}
+
+type Service @embedded{
+  id :String   
+  _id: Int
+  type :String!
+  balance :Int  
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+enum BillingDefaultType {
+  DEBIT_CARD,
+  BANK_ACCOUNT
+}
+
+type Company @db(name: "company") {
+  _id: Int
+  id: ID! @id
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  relationships: [RelationshipCompanyInfo!]! @relation(name: "CompanyRelationships")
+
+  publisherKey: String @db(name: "PublisherKey")
+  uniqueKey: String! @db(name: "UniqueKey")
+
+  name: String @db(name: "Name") @unique
+  currency: String @db(name:"Currency")
+  enabled: Int @db(name: "Enabled") @default(value: 1)
+  hasMediaAccess: Boolean @db(name: "HasMediaAccess")
+  isMasterPublisher: Boolean @db(name: "IsMasterPublisher")
+  isReseller: Boolean @db(name: "IsReseller")
+  type: Int @db(name: "Type")
+
+  ## Whether company can track scripts - hardcoded. Used in AdminArea to grant access to Inspired
+  canDoScriptTracking: Boolean @db(name: "CanDoScriptTracking")
+  canDoRotationalTags: Boolean @db(name:"CanDoRotationalTags")
+
+  landline: String
+
+  status: Int @db(name: "Status")
+  # Field type not supported: null
+  # tagLine: <Unknown> @db(name: "TagLine")
+  url: String @db(name: "URL")
+  email: String
+  address: GenericAddress
+  logoURL: String
+  info:String @db(name: "Company Info")
+  regNum:String @db(name: "Company Registration Number")
+  vatNum:String @db(name: "Company Sales VAT Number")
+  members: [CompanyMembership!]! @relation(name: "CompanyMembership", link: INLINE)
+
+  profiles: [CompanyProfile!]! @relation(name: "CompanyProfiles")
+
+  category: String
+
+  ## Billing
+  stripeCustomerId: String
+  stripeAccountId: String
+  taxId: String
+  mcc: String
+  tos_acceptance: TosAcceptance
+  business_type: String
+  masterContact: CompanyMembership @relation(name: "MasterContact", link: INLINE)
+  billingContact: CompanyMembership @relation(name: "BillingContact", link: INLINE)
+  representativeContact: CompanyMembership @relation(name: "Representative", link: INLINE)
+  directorContact: CompanyMembership @relation(name: "Director", link: INLINE)
+  executiveContact: CompanyMembership @relation(name: "Executive", link: INLINE)
+  ownersContact: CompanyMembership @relation(name: "Owners", link: INLINE)
+  billingEmail: String
+  billingPhone: String
+  contactXeroId: String
+  billingReferral: BillingCoupon @relation(name: "ReferralCode", link: INLINE)
+
+
+  subscriptions: [String!]
+  permittedCoupons: [BillingCoupon!] @relation(name: "CouponPermittedCompany")
+  redeemedCoupons: [BillingCoupon!] @relation(name: "CouponUsedCompany", link: INLINE)
+  bankAccount: BankAccount @relation(name: "CompanyBankAccount", link: INLINE)
+
+  billingDefaultType: BillingDefaultType
+  billingPreferenceCardId: String
+
+  isPrepaid: Boolean
+
+  relationshipRequestKey: String
+
+  employeeCanAccessMarketing: [CompanyMembership!] @relation(name: "EmployeeCanAccessMarketing", link: INLINE)
+}
+
+type MediaRates @db(name:"media_rates"){
+  _id: ID! 
+  id: ID! @id(strategy:NONE)
+  averageDailyUniqueReach: Int @db(name:"AverageDailyUniqueReach")
+  averageDailyFrequency: Int @db(name:"AverageDailyFrequency")
+
+  country: String @db(name:"Country")
+  zone: String @db(name:"Zone")
+  vertical: String @db(name:"Vertical")
+  pricingModel: String @db(name:"PricingModel")
+  averageVolume: Int @db(name:"AverageVolume")
+  format: String @db(name:"Format")
+  formatSize: String @db(name:"FormatSize")
+  device: String @db(name:"Device")
+  placement: String @db(name:"Placement")
+  currency: String @db(name:"Currency")
+  publisherRate: Float @db(name:"PublisherRate")
+  InitialPubRate: Float @db(name:"InitialPubRate")
+  publisherFee: Float @db(name:"PublisherFee")
+  clientRate: Float @db(name:"ClientRate")
+
+  publisherSite: PublisherSite! @relation(name: "PublisherSiteMediaRates", link: INLINE)
+}
+
+type PublisherSite @db(name: "publisher_site") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  _company: Int! @db(name:"Company")
+
+  name: String! @db(name: "Name") @unique
+  zones: [String!]! @db(name: "Zones")
+  countries: [String!] @db(name: "Countries")
+  publisherCountry: String @db(name: "PublisherCountry")
+  vertical: String @db(name: "Vertical")
+  Devices: PublisherDevices
+
+  mediaRates: [MediaRates!]! @relation(name:"PublisherSiteMediaRates")
+
+  displayInSiteList: Boolean
+
+  status: Status @default(value: ACTIVE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  archiveDate: DateTime
+  studio: Boolean @db(name: "Studio")
+}
+ 
+type PublisherDevices @embedded {
+  desktop: Boolean
+  mobile: Boolean
+  tablet: Boolean
+}
+
+# type PublisherTagSize @embedded {
+#   width: String @db(name:"Width")
+#   height: String @db(name:"Height")
+# }
+# 
+# type PublisherTag @db(name: "publisher_tag") {
+#   _id: ID! 
+#   id: ID! @id(strategy:NONE)
+#   _company: Int @db(name:"Company")
+#   site: PublisherSite! @db(name:"Site") @relation(link: INLINE)
+#   name: String! @db(name: "Name")
+#   zone: String! @db(name:"Zone")
+#   device: String! @db(name:"Device")
+#   formats: [String!]! @db(name:"Formats")
+#   size: PublisherTagSize! @db(name:"Size")
+#   status: String! @db(name:"Status") @default(value:"LIVE")
+#   _mediatag: Int @db(name:"MediaTag")
+# 
+# }
+
+type MediaFormat @db(name: "media_format") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  formatID: Int! @db(name: "FormatID")
+  format: String! @db(name: "Format")
+  version: String! @db(name: "Version") @default(value:"0.0.1")
+  executeCode: String! @db(name: "ExecuteCode")
+}
+
+type CompanyMembership {
+  id: ID! @id
+  company: Company! @relation(name: "CompanyMembership")
+  email: String
+  phone:String
+  role: CompanyRole! @default(value: USER)
+  _fenixUserGroup: UserGroup @relation(link: INLINE)
+  user: User @relation(name: "UserToCompanies")
+  status:Status @default(value: ACTIVE)
+  landline:String
+
+  # Used for personal and company calendars
+  eventInvitations: [EventInvitation!]! @relation(link: INLINE)
+
+  platformEvents: [PlatformEvent!]!
+  calendarEvents: [CalendarEvent!]!
+  platformEventSlots: [PlatformEventSlot!]!
+
+  # Employee profile
+  jobTitle: String
+  avatar: String
+  department: String
+
+  profiles: [EmployeeProfile!]! @relation(name: "EmployeeProfiles")
+
+  permissions: PermissionsNew @relation(name: "EmployeePermissions")
+
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+type CompanyDomain {
+  id: ID! @id
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  company: Company! @relation(link: INLINE)
+
+  domain: String!
+  verified: Boolean!
+}
+
+enum EmailDomainStatus {
+  CREATED
+  VERIFIED
+  ARCHIVED
+}
+
+type CompanyEmailDomain {
+  id: ID! @id
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  company: Company! @relation(link: INLINE)
+
+  domain: String!
+  status: EmailDomainStatus! @default(value: CREATED)
+}
+
+enum Status {
+  ACTIVE,
+  ARCHIVED
+}
+
+enum CompanyRole {
+  ADMIN
+  SUPER_ADMIN,
+  USER,
+  MASTER_ADMIN
+}
+
+enum RelationshipType {
+  CHILD,
+  CLIENT,
+  SELLER
+}
+
+enum RelationshipStatus {
+  SENT,
+  CONFIRMED
+}
+
+enum RelationshipCompanyRole {
+  REQUESTER,
+  RECIPIENT
+}
+
+enum RelationshipFamilyRole {
+  REQUESTER,
+  RECIPIENT
+}
+
+type RelationshipCompanyInfo {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  company: Company! @relation(name: "CompanyRelationships", link: INLINE)
+  role: RelationshipCompanyRole!
+  users: [CompanyMembership!]! @relation(name: "UserCompanyRelationships", link: INLINE)
+  relationship: CompanyRelationship!
+}
+
+type RelationshipFamilyInfo {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  user: User! @relation(name: "FamilyRelationships", link: INLINE)
+  role: RelationshipFamilyRole!
+  users: [User!]! @relation(name: "UserFamilyRelationships", link: INLINE)
+  relationship: FamilyRelationship!
+}
+
+
+type UserMarketingPreference {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  user: User! @relation(name: "MarketingPrefToUser", link: INLINE)
+  company: Company! @relation(name: "MarketingPrefToCompany", link: INLINE)
+  preferences: Json!
+}
+
+enum CompanyRelationshipType {
+  FAMILY,
+  FRIEND,
+  BUSINESS
+}
+
+enum FamilyRelationshipType {
+  BROTHER,
+  SISTER,
+  FATHER,
+  MOTHER,
+  SON,
+  DAUGHTER,
+  NIECE,
+  NEPHEW,
+  GRANDPARENT,
+  AUNT,
+  COUSIN,
+  UNCLE,
+  HUSBAND,
+  GRANDDAUGHTER,
+  PARENT,
+  SIBLING_IN_LAW,
+  MOTHER_IN_LAW,
+  SIBLING,
+  FATHER_IN_LAW,
+  GRANDCHILD,
+  SON_IN_LAW,
+  EXTENDED_FAMILY,
+  DAUGHTER_IN_LAW,
+  SPOUSE,
+  WIFE,
+  CLOSE_FRIEND,
+  FAMILY_FRIEND,
+  OTHER
+}
+
+type CompanyRelationship {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  companies: [RelationshipCompanyInfo!]! @relation(link: INLINE)
+  type: CompanyRelationshipType
+  status: RelationshipStatus! @default(value: SENT)
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+type FamilyRelationship {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  users: [RelationshipFamilyInfo!]! @relation(link: INLINE)
+  type: FamilyRelationshipType
+  isChild: Boolean 
+  status: RelationshipStatus! @default(value: SENT)
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+enum RelationshipPermissionsType {
+  CAMPAIGN
+}
+
+type RelationshipPermissions {
+  _id: ID! @id
+  relationship: CompanyRelationship @relation(link: INLINE)
+  type: RelationshipPermissionsType!
+  campaign: Campaign @relation(link: INLINE)
+}
+
+type Brand @db(name:"brand") {
+  _id: Int
+  id: ID! @id
+  _client: Int! @db(name:"Client")
+  client: Company @relation(name:"BrandClient" link: INLINE)
+  _advertiser: Int! @db(name:"Advertiser")
+  advertiser: Company @relation(name:"BrandAdvertisor" link: INLINE)
+  name: String @db(name: "Name")
+}
+
+type Advertiser @db(name:"advertiser") {
+  _id: Int
+  id: ID! @id
+  company: Company @relation(name:"AdvertiserCompany" link: INLINE)
+  _company: Int! @db(name:"Company")
+  name: String @db(name:"Name")
+}
+
+type Currency {
+  id: ID! @id
+  name: String!
+}
+
+enum ChallengeType {
+  PHONE
+  EMAIL
+  INVITE
+}
+enum ChallengeStatus {
+  UNUSED,
+  REVOKED,
+  USED
+}
+type LoginChallenge {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  user: User! @relation(name:"UserLoginChallenge" link: INLINE)
+  challengeType: ChallengeType!
+  code: String!
+  status:ChallengeStatus
+}
+
+type UpdateChallenge {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  user: User! @relation(name:"UserUpdateChallenge" link: INLINE)
+  challengeType: ChallengeType!
+  code: String!
+  status: ChallengeStatus
+  unverifiedEmail: String
+  unverifiedPhone: String
+}
+
+type UserSession @db(name: "user_sessions"){
+  _id: ID! 
+  id: ID! @id(strategy:NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  _companyID: Int @db(name: "CompanyID")
+  companyID: Company! @relation(link: INLINE)
+
+  _sessionID: String @db(name: "SessionID")
+  sessionStart: DateTime @db(name: "SessionStart") @createdAt
+
+  _userID: Int @db(name: "UserID") 
+  userID: User! @relation(link: INLINE)
+
+  # Metadata
+  ipAddress: String
+  userAgent: String
+}
+
+type UserGroup @db(name: "user_groups") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+
+  company: Company @relation(link: INLINE)
+  _company: Int @db(name:"Company")
+
+  # Can be "Super Admins", "Admins", "Users", "Default"
+  name: String @db(name: "Name")
+  role: String
+
+  permissions: PermissionsNew @relation(name: "UserGroupPermissions")
+}
+
+type Permissions @db(name: "permissions") {
+  _id: ID! @id
+  scope: String! @db(name: "Scope")
+  group: UserGroup @relation(link: INLINE) @db(name: "Group")
+  campaign: Int @db(name: "Campaign")
+  item: String @db(name:"Item")
+  perms: [String!]! @db(name:"Perms")
+  _user: Int @db(name: "User") #legacy
+  user: User @relation(link: INLINE)
+
+}
+
+type LegacyStudioToken @db(name: "legacy_studio_token") {
+  _id: ID! @id
+  key: String! @db(name: "Key")
+  _user: Int! @db(name: "User")
+  _projectId: Int @db(name: "ProjectId")
+  createdAt: DateTime @createdAt @db(name: "TimeGenerated")
+}
+
+type StudioTemplate {
+  _id: ID! @id
+  name: String!
+  description: String
+  content: String!
+  keywords: [String!]
+  user: User! @relation(link: INLINE, name: "StudioTemplateOwner")
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+type LegacyStudioProject @db(name: "legacy_studio") {
+  _id: Int
+  id: ID! @id
+  _campaign: Int! @db(name: "Campaign")
+  title: String @db(name: "Title")
+  content: String @db(name: "Content")
+  html: String @db(name: "UnencodedHTML")
+  comments: String @db(name: "Comments")
+  size: String @db(name: "Size")
+  type: Int @db(name: "ProjectType")
+  crossDeviceURL: String @db(name: "CrossDeviceURL")
+  smartphoneProjectID: String @db(name: "SmartphoneProjectID")
+  tabletProjectID: String @db(name: "TabletProjectID")
+  desktopProjectID: String @db(name: "DesktopProjectID")
+  status: Int @db(name: "Status")
+  _user: Int! @db(name: "User")
+  createdAt: DateTime @createdAt @db(name: "Created")
+  updatedAt: DateTime @updatedAt @db(name: "Updated")
+}
+
+enum UserGender {
+  MALE,
+  FEMALE,
+  OTHER,
+  NS
+}
+
+type User @db(name: "user") {
+  # To match with old phoenix
+  _id: Int
+  id: ID! @id
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  accountStatus: Int @db(name: "AccountStatus")
+  avatar: String
+  company: Company @relation(name: "UserToCompany", link: INLINE)
+  companies: [CompanyMembership!]! @relation(name: "UserToCompanies", link: INLINE)
+
+  # Legacy
+  _company: Int @db(name:"Company")
+
+  fenixUserGroup: UserGroup @relation(link: INLINE) @db(name:"FenixUserGroup")
+  country: String @db(name: "Country")
+  address: GenericAddress @relation(name: "Address", link: INLINE)
+  zip:String @db(name:"Zip")
+  dob: DateTime @db(name: "BirthDate")
+  email: String! @db(name: "Email") @unique
+  password: String @db(name:"FenixPassword")
+  enabled: Boolean @db(name:"Enabled") @default(value: true)
+  
+  enable: Int @db(name: "Enable") @default(value: 1)
+  phone: String
+  lastActivity: DateTime @db(name: "LastLogin")
+  # Fenix uses "Name"
+  firstName: String! @db(name: "Name")
+
+  # Fenix uses "Surname"
+  lastName: String! @db(name:"Surname")
+
+  emailVerified: Boolean @default(value: false)
+  phoneVerified: Boolean @default(value: false)
+  inviteUsed : Boolean @default(value: false)
+  
+  inviteCode: String 
+  facebook: String
+  instagram: String 
+  linkedIn: String 
+  qq: String 
+  skype: String 
+  twitter: String 
+  weChat: String  
+  weibo: String
+  socialLine: String
+  gender: UserGender
+
+  passportNumber: String
+  nationalSecurityNumber: String
+  secondaryProfilePic: String
+  deliveryAddress: GenericAddress @relation(name: "DeliveryAddress", link: INLINE)
+
+  profiles: [UserProfile!]! @relation(name: "UserProfiles")
+
+  permittedCoupons: [BillingCoupon!] @relation(name: "CouponPermittedUser")
+  redeemedCoupons: [BillingCoupon!] @relation(name: "CouponUsedUser", link: INLINE)
+
+  companyLimit: Int
+
+  synkdDataSellAllowed: Boolean
+  synkdDataSellAllowedDate: DateTime
+  userProfileLockedUntil: DateTime
+
+
+  notifications: [CommunityNotification!] @relation(name: "UserReceivedNotification")
+  isChild: Boolean
+  
+  walkthroughStep: Int
+  doNotShowWalkthrough: Boolean
+}
+
+type BillingLedger @db(name: "debit_ledger") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  company: Company! @relation(link: INLINE)
+  user: User @relation(link: INLINE, name: "UserToLedger")
+
+  # Legacy
+  _company: Int! @db(name: "Company")
+  _user: Int @db(name: "User")
+  type: String @db(name: "Type")
+  description: String @db(name: "Description")
+  service: String @db(name: "Service")
+  amount: Int @db(name: "Amount")
+  timestamp: DateTime @db(name: "Timestamp")
+  invoiceID: String @db(name: "InvoiceID")
+  campaign: Int @db(name: "Campaign")
+
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+}
+
+type BillingItem @embedded {
+  lineID: String @db(name: "LineID")
+  service: String @db(name: "Service")
+  referenceId: String @db(name: "ReferenceId")
+  quantity: Int @db(name: "Quantity")
+  description: String @db(name: "Description")
+  net: Int @db(name: "NetAmount")
+  tax: Int @db(name: "Tax")
+  gross: Int @db(name: "GrossAmount") 
+}
+
+type PaymentReference @embedded {
+  stripe: String @db(name: "Stripe")
+}
+
+type InvoiceExtra @embedded {
+  topupService: String @db(name: "TopupService")
+  topupAmount: Int @db(name: "TopupAmount")
+}
+
+type BillingInvoice @db(name: "debit_invoice") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  company: Company! @relation(link: INLINE)
+
+  # **** Legacy
+  _company: Int! @db(name: "Company")
+  currency: String @db(name: "Currency")
+  # **** Apparently @db directive is not allowed on embedded relations
+  LineItems: [BillingItem!]!
+  net: Int @db(name: "NetAmount")
+  tax: Int @db(name: "Tax")
+  gross: Int @db(name: "GrossAmount") 
+  issueDate: DateTime @db(name: "IssueDate")
+  dueDate: DateTime @db(name: "DueDate")
+  status: String @db(name: "Status")
+  xeroID: String @db(name: "XeroID")
+  paymentRefs: PaymentReference
+  extra: InvoiceExtra
+}
+
+type TopupServicePricing @embedded {
+  currency: String!
+  amount: Int!
+  price: Float!
+}
+
+type MarketingTopupService {
+  _id: ID
+  id: ID! @id(strategy:NONE)
+  name: String!
+  title: String
+  userFriendlyName: String!
+  pricing: [TopupServicePricing!]!
+  description: String
+}
+
+type BillingTaxRate {
+  _id: ID! @id
+  type: String!
+  rate: Int!
+  countryCode: String!
+  currencyCode: String
+}
+
+enum GeneralStatus {
+  DRAFT
+  LIVE,
+  ARCHIVED
+}
+
+enum ClusterType {
+  STRATEGY
+  EVENT
+}
+
+type CrmQuestion {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  id_number: Int
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  createdByUser: User @relation(link: INLINE, name: "CrmQuestionUserCreated")
+  archiveDate: DateTime
+  company: Company! @relation(name:"CrmQuestionToCompany", link: INLINE)
+  questionShortText: String!
+  questionDescription: String
+
+  status: GeneralStatus @default(value: DRAFT)
+  type: ClusterType @default(value: STRATEGY)
+
+  
+  # -----------------------------------------------------------------------------------------------------------
+  # A combination of minimum and maximum selection determines how many choices are required, and how many choices
+  # can a user make. For example: 
+  # * Select exactly 2: mimumum = 2, maximum = 2
+  # * At most 2 (not required): minumum = 0, maximum = 2
+  # * At least 2: minimum = 2, maximum = 999
+  # The application logic should determine how to choose these
+  # -----------------------------------------------------------------------------------------------------------
+  minimumSelections: Int! @default(value: 1)
+  maximumSelections: Int! @default(value: 1)
+  options: [CrmQuestionOption!]! @relation(name:"CrmQuestionOption", link: INLINE)
+
+  crmCluster: CrmCluster @relation(name: "CrmClusterToQuestion")
+
+}
+
+type CrmQuestionOption {
+  _id: ID!
+  id: ID! @id(strategy: NONE)
+  question: CrmQuestion! @relation(name:"CrmQuestionOption")
+
+  # **** An option can have a short and a long text. Short text should be a maximum of 50 characters. 
+  # **** Long text maximum of 500
+  optionShortText: String!
+  optionDescription: String
+
+  crmSubCluster: CrmSubCluster @relation(name: "CrmSubClusterToOption")
+}
+
+enum CrmQuestionResponseType {
+  USER_FILLED
+  MANUAL
+}
+
+type CrmQuestionResponse {
+  _id: ID!
+  id: ID! @id(strategy: NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  responseType: CrmQuestionResponseType! @default(value: USER_FILLED)
+  responseToQuestion: CrmQuestion! @relation(link: INLINE)
+  respondingUser: User! @relation(link: INLINE)
+  response: [CrmQuestionOption!]! @relation(link: INLINE)
+}
+
+enum CrmClusterType {
+  AUTOMATED
+  MANUAL
+  EVENT
+  CUSTOMERS
+  AUTOMATED_EVENT
+}
+
+enum CrmUserStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+type CrmCompany @embedded {
+  id: ID!
+  email: String
+  profiles: [CompanyProfile] @relation(link: INLINE)
+  address: GenericAddress @relation(link: INLINE)
+  category: String
+
+  em_email: String
+  em_profiles: [EmployeeProfile] @relation(link: INLINE)
+  em_jobTitle: String
+}
+
+type CrmUser {
+  id: ID! @id
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+
+  associatedCompany: Company! @relation(name: "CrmUserToCompany", link: INLINE)
+  user: User @relation(name: "CrmUserToUser", link: INLINE)
+  
+  firstName: String
+  lastName: String
+  email: String
+  emailList: [String]
+  phone: String
+  gender: String
+  address: GenericAddress
+  dob: DateTime
+
+  otherData: Json
+
+  status: CrmUserStatus @default(value: SUBSCRIBED)
+
+  personal_facebook: String
+  personal_instagram: String
+  personal_twitter: String
+  personal_wechat: String
+  personal_qq: String
+  personal_personal_id: String
+  personal_notes: String
+  personal_notes_follow_up_date: DateTime
+
+  # -----------------------------------------------------
+  # DEPRECATED!
+  # The below fields are moved under companies array (see below and the CrmCompany embedded relation above)
+  # to allow for multiple companies
+  # in case you need to add any company/employee related field, please add it to CrmCompany
+
+  em_job_type: String
+  em_department: String
+  em_email: String
+  em_phone: String
+  em_notes: String
+  em_notes_follow_up_date: DateTime
+
+  cm_name: String
+  cm_email: String
+  cm_website: String
+  cm_phone: String
+  cm_regnum: String
+  cm_sales_tax: String
+  cm_address: String
+  cm_city: String
+  cm_zipcode: String
+  cm_country: String
+  cm_category: String
+  cm_notes: String
+  cm_notes_follow_up_date: DateTime
+
+  # -----------------------------------------------------
+
+  companies: [CrmCompany] @relation(link: INLINE)
+}
+
+  # -----------------------------------------------------------------------------------------------------------
+  # A crm cluster can be automatically generated based on a question or be manually created by the user
+  # -----------------------------------------------------------------------------------------------------------
+
+# -----
+# User feeedback for DIT campaign
+# -----
+
+type UserFeedback {
+  _id: ID!
+  id: ID! @id(strategy: NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  user: User! @relation(link: INLINE)
+  feedback: String
+  crm: CrmCluster @relation(link: INLINE)
+}
+
+
+type CrmCluster {
+  _id: ID!
+  id: ID! @id(strategy: NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  createdByUser: User @relation(link: INLINE, name: "ClusterUserCreated")
+  archiveDate: DateTime
+
+  name: String
+  description: String
+  clusterType: CrmClusterType!
+  company: Company @relation(link: INLINE)
+  users: [CrmUser!]! @relation(link: INLINE)
+
+  crmQuestion: CrmQuestion @relation(name: "CrmClusterToQuestion", link: INLINE)
+  subClusters: [CrmSubCluster!]! @relation(name: "CrmSubClusters", link: INLINE)
+
+  status: Status @default(value: ACTIVE)
+
+
+  # TODO: add manual creation and filtration logic
+}
+
+type CrmSubCluster {
+  _id: ID!
+  id: ID! @id(strategy: NONE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+
+  name: String
+  description: String
+  clusterType: CrmClusterType!
+  crmOption: CrmQuestionOption @relation(name: "CrmSubClusterToOption", link: INLINE)
+  parentCluster: CrmCluster @relation(name: "CrmSubClusters")
+  users: [CrmUser!]! @relation(link: INLINE)
+
+}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- EVENT PLATFORM -----------------------------------------------------
+# There are three type of events at the moment (CalendarEvent, PlatformEvent, and PlatformEventSlot) but there can be n types
+# Please make sure each event type adheres to the same interface as CalendarEvent but it can have additional fields as necessary
+# This is to make sure that there is ineroperability, for example, when we send a calendar invite on email
+# 
+# NOTE: if in future a database structure allows implementing interfaces, or nesting is simple (Event can have Event inside), it may be better
+# ------------------------------------------------------------------------------------------------
+
+
+# THIS IS TREATED AS AN INTERFACE
+# Regular calendar event, for example the kind you would get on your outlook calendar
+
+enum CalendarStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+type CalendarEvent {
+  # ----------- ONLY MODIFY WITH CALENDAR EVENT INTERFACE ----------------------
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  calanderSlotId: ID
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  startAt: DateTime!
+  endAt: DateTime!
+  name: String
+  description: String
+  location: String
+  geo: String
+  notes: String
+  organiser: CompanyMembership! @relation(link: INLINE)
+  attendees: [EventInvitation!]! @relation(link: INLINE)
+  timezone: String
+  status: CalendarStatus @default(value: ACTIVE)
+  # ---------------------------------------------------------------------------
+}
+
+
+
+enum EventType {
+  # In case of a platform event, booking isn't restricted
+  PLATFORM_EVENT
+  PLATFORM_EVENT_SLOT
+  PLATFORM_EVENT_PRICING_SLOT
+  CALENDAR_EVENT
+}
+
+type CalendarInvitation {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+  invitee: CompanyMembership! @relation(name: "SenderUser", link: INLINE)
+  accepted: [CompanyMembership!] @relation(name: "UserAccepted", link: INLINE)
+  declined: [CompanyMembership!] @relation(name: "UserDeclined", link: INLINE)
+  inviteed: [CompanyMembership!] @relation(name: "UserInvited", link: INLINE)
+
+  lastInviteSent: DateTime
+  calendarEvent: CalendarEvent! @relation(name: "CalendarInvitationDetail", link: INLINE)
+}
+
+enum InvitationStatus {
+  AWAITING
+  ACCEPTED
+  DECLINED
+  ARCHIVED
+  EXPIRED
+}
+
+enum NotificationStatus {
+  READ
+  UNREAD
+  ARCHIVED
+}
+
+# EventInvitation is sent out to potential attendees. In case of private events, only those invited will be able to see the page
+type EventInvitation {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  eventType: EventType
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+  invitationStatus: InvitationStatus! @default(value: AWAITING)
+  invitee: CompanyMembership!
+  invitationEmail: String
+
+  lastInviteSent: DateTime
+
+  # One of these four must be present
+  calendarSlotId: ID
+  calendarEvent: CalendarEvent
+  platformEvent: PlatformEvent
+  platformEventSlot: PlatformEventSlot
+  platformEventPricingSlot: PlatformEventCart @relation(name: "PlatformEventPricingSlotInvitation")
+  }
+
+type EventRequestInvitation {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+
+  status: InvitationStatus! @default(value: AWAITING)
+  requester: User! @relation(name: "UserRequester", link: INLINE)
+  requesterMembership: CompanyMembership @relation(name: "CompantMembershipRequester", link: INLINE)
+  event: PlatformEvent! @relation(name: "EventRequested", link: INLINE)
+
+  lastInviteSent: DateTime
+}
+
+enum PlatformEventLanguage {
+  ENGLISH
+  CHINESE
+  FRENCH
+}
+
+enum EventAttendeeDataPreferenceType {
+  PROFILE_PICTURE
+  NAME
+  PROFILE
+  KEYWORDS
+  WEBSITE
+  EMAIL
+  MOBILE
+  GENDER
+  DATE_OF_BIRTH
+  ADDRESS
+  ZIPCODE
+  COUNTRY
+  RATING
+}
+
+enum EventCompanyDataPreferenceType {
+  LOGO
+  NAME
+  PROFILE
+  KEYWORDS
+  IMAGES
+  WEBSITE
+  EMAIL
+  LANDLINE
+  CATEGORY
+  ADDRESS
+  ZIPCODE
+  COUNTRY
+  RATING
+}
+
+type PlatformEventMember {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  role: CompanyRole
+  platformEvent: PlatformEvent! @relation(link: INLINE)
+  profile: CompanyMembership @relation(link: INLINE)
+  user: User @relation(link: INLINE)
+  status: Status! @default(value: ACTIVE)
+}
+
+type PlatformEvent {
+  # ----------- ONLY MODIFY WITH CALENDAR EVENT INTERFACE ----------------------
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  id_number: Int
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  notificationStatus: NotificationStatus @default(value: UNREAD)
+  createdByUser: User @relation(link: INLINE, name: "EventUserCreated")
+  archiveDate: DateTime
+  startAt: DateTime!
+  endAt: DateTime!
+  name: String
+  name_check: Boolean
+  description: String
+  description_check: Boolean
+  location: String
+  location_check: Boolean
+  geo: String
+  notes: String
+  organiser: CompanyMembership! @relation(link: INLINE)
+  attendees: [EventInvitation!]! @relation(link: INLINE)
+  timezone: String
+  timezone_check: Boolean
+  timezoneLocation: String
+  # ---------------------------------------------------------------------------
+  status: GeneralStatus! @default(value: DRAFT)
+  slug: String! @unique
+  slotDurationMins: Int @default(value: 30)
+  platformEventType: PlatformEventType! @default(value: REGULAR)
+  theme: PlatformEventTheme
+  menusOrder: [PlatformEventMenuPage]
+  menus: [PlatformEventMenuSettings!]
+  venues: [PlatformEventVenue!]! @relation(link: INLINE)
+  contents: [PlatformEventContent!]!
+  language: PlatformEventLanguage
+  qr_code_url: String
+  qr_code_url_check: Boolean
+  privacy: String
+  privacy_check: Boolean
+  legal: String
+  legal_check: Boolean
+  contact_us: String
+  contact_us_check: Boolean
+  your_data: String
+  your_data_check: Boolean
+  logo_image_check: Boolean
+  header_image: String
+  header_image_check: Boolean
+  left_image: String
+  left_image_check: Boolean
+  right_image: String
+  right_image_check: Boolean
+
+  attendee_preferences: [EventAttendeeDataPreferenceType!]
+  company_preferences: [EventCompanyDataPreferenceType!]
+  maximumAttendees: Int @default(value: 20)
+
+  cluster: CrmCluster @relation(link: INLINE, name: "EventCluster")
+  customCluster: [CrmCluster!] @relation(link: INLINE, name: "EventClusterCustom")
+}
+
+enum PlatformEventMenuPage {
+  HOME,
+  CALENDAR,
+  CONTENT,
+  CONTENT_CUSTOM,
+  COMPANIES,
+  ATTENDEES,
+  CONTENT_PRICING,
+  CLUSTER,
+  ADMIN
+}
+
+type PlatformEventMenuSettings @embedded {
+  label: String!
+  type: PlatformEventMenuPage!
+  parameter: String
+  link: String
+  showToAll: Boolean @default(value: false)
+  show: Boolean! @default(value: true)
+  adminOnly: Boolean! @default(value: false)
+  userVisible: [User!]  @relation(name: "UserVisible", link: INLINE)
+  userAdmin: [User!]  @relation(name: "UserAdmin", link: INLINE)
+}
+
+enum PlatformEventType {
+  REGULAR,
+  # Trade events have business matching. e.g. DIT
+  TRADE,
+  RESTAURANT,
+  SALON,
+  MEETINGROOMS,
+  GATHERING,
+  EXHIBITION,
+  BIRTHDAY,
+  MECHANIC,
+  PHOTOGRAPHY,
+  CINEMA,
+  MUSEUM,
+  CONFERENCES,
+  WEDDINGS,
+  TENNIS,
+  BASKETBALL,
+  FOOTBALL,
+  SQUASH,
+  GARAGE,
+  RUGBY,
+  AFL,
+  SPORT,
+  NFL,
+  SURGERY,
+  DENTIST
+}
+
+type PlatformEventTheme @embedded {
+  logoURL: String
+  primaryColour: String
+  primaryTextColour: String
+  secondaryColour: String
+  secondaryTextColour: String
+  calendarPrimaryColour: String
+  calendarPrimaryTextColour: String
+  calendarSecondaryColour: String
+  calendarSecondaryTextColour: String
+}
+type ContentLink @embedded {
+  id: ID! @id(strategy:NONE)
+  name: String!
+  link: String!
+}
+
+enum PricingContentType {
+  SINGLE
+  MULTIPLE
+}
+
+type PlatformEventContent @embedded {
+  id: ID! @id(strategy:NONE)
+  name: String
+  contentStatus: String
+  body: String
+  imageURL: String
+  linkURL: String
+  keywords: [String!]
+  subContentType: String @efault(value: "content")
+  pricingType: PricingContentType @default(value: MULTIPLE)
+  pricing: [PlatformEventContentPricing!] @relation(name:"ContentPricingEmployee", link: INLINE)
+  pricingMaster: PlatformEventContentPricing @relation(name:"ContentPricingMaster", link: INLINE)
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  startDate: DateTime
+  endDate: DateTime
+  images: [String!]
+  links: [ContentLink!]
+  isCartAvailable: Boolean
+  isVenueChecked: Boolean
+  isScheduleAvailable: Boolean
+  isPricingAvailable: Boolean
+  selectedVenue: String
+  isConstraintAvailable: Boolean
+}
+
+enum PricingUserType {
+  EMPLOYEE,
+  USER,
+}
+
+type PlatformEventContentPricing {
+  id: ID! @id(strategy:NONE)
+  user_type: PricingUserType @default(value: EMPLOYEE)
+  calendarSlotId: ID
+  employee: [CompanyMembership!] @relation(link: INLINE)
+  user: [User!] @relation(name: "PricingUser", link: INLINE)
+  currency: String
+  price: Float
+  duration: Int
+  slots: Int
+  tax: Int
+  remaining_slots: Int
+  booked_slots: Int @default(value: 0)
+  availability_weeks: [String!]
+  availability_hours: [String!]
+  show_rating: Boolean
+}
+
+enum CartStatus {
+  PENDING
+  PAYMENT_VERIFICATION
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  APPROVED
+  REJECTED
+  PROCESSED
+  COMPLETE
+  ARCHIVED
+}
+
+type PlatformEventCart {
+  id: ID! @id(strategy:NONE)
+  item: String!
+  calanderSlotId: ID
+  pricing: PlatformEventContentPricing! @relation(link: INLINE)
+  currentPrice: Float
+  currentCurrency: String
+  quantity: Int!
+  type: String!
+  event: PlatformEvent! @relation(link: INLINE)
+  user: User! @relation(link: INLINE)
+  userCompanyMembership: CompanyMembership @relation(name: "UserCompanyMembership", link: INLINE)
+  employeeActionBy: CompanyMembership @relation(name: "EmployeeActor", link: INLINE)
+  qrcodeKey: String
+  qrcodeImage: String
+  paymentIntentId: String
+  checkoutSessionId: String
+  xeroId: String
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  status: CartStatus!
+  startAt: DateTime
+  endAt: DateTime
+  rating: Int
+  invitation: [EventInvitation!] @relation(name: "PlatformEventPricingSlotInvitation", link: INLINE)
+}
+
+enum TransactionStatus {
+  INCOME,
+  OUTCOME
+}
+
+type PlatformEventTransaction {
+  id: ID! @id(strategy:NONE)
+  txnId: String!
+  event: PlatformEvent! @relation(name: "PlatformEventTransactionEventId", link: INLINE)
+  amount: Int!
+  refunded: Boolean
+  currency: String!
+  status: TransactionStatus! @default(value: INCOME)
+  carts: [PlatformEventCart!] @relation(name: "PlatformEventTransactionCartId", link: INLINE)
+  user: User! @relation(name: "UserCartTransaction", link: INLINE)
+  stripeRaw: String
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+enum EventVenueType {
+  GENERIC,
+  ONLINE,
+  ROOM,
+  HALL,
+  SEAT,
+  TABLE,
+  SLOT,
+  COURT,
+  BERTH,
+  THEATRE,
+  PITCH
+}
+
+type PlatformEventVenue {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  platformEvent: PlatformEvent!
+  name: String!
+  maxAttendees: Int!
+  status: Status @default(value: ACTIVE)
+  type: EventVenueType @default(value: GENERIC)
+  link: String
+  platformEventSlots: [PlatformEventSlot!] @relation(name: "PlatformEventSlotVenue")
+}
+
+type PlatformEventSlot {
+  # ----------- ONLY MODIFY WITH CALENDAR EVENT INTERFACE ----------------------
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  calendarSlotId: ID
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  startAt: DateTime!
+  endAt: DateTime!
+  name: String
+  description: String
+  location: String
+  geo: String
+  notes: String
+  cart: PlatformEventCart @relation(link: INLINE)
+  contentId: String
+  organiser: CompanyMembership! @relation(link: INLINE)
+  attendees: [EventInvitation!]! @relation(link: INLINE)
+  timezone: String
+  # ---------------------------------------------------------------------------
+
+  venue: PlatformEventVenue! @relation(name: "PlatformEventSlotVenue", link: INLINE)
+  event: PlatformEvent @relation(name: "InvitationEventId", link: INLINE)
+
+  # To override the maximum attendees
+  overrideMaxAttendees: Int
+}
+
+type PlatformEventQRCodeScan {
+  id: ID! @id(strategy:NONE)
+  event: PlatformEvent! @relation(link: INLINE)
+  user: User! @relation(link: INLINE)
+  userCompanyMembership: CompanyMembership @relation(name: "UserCompanyProfile", link: INLINE)
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+# ------------------------------------------------------------------------------------------------
+# -------------------------------------- BILLING -----------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+type BankAccount {
+  id: ID! @id
+  stripeBankAccountId: String
+  country: String
+  currency: String
+  account_holder_name: String
+  account_holder_type: String
+  routing_number: String
+  sort_bsb_number: String
+  account_number: String
+  iban: String
+  counterparty_id : String
+  counterparty_account_id : String
+
+}
+
+type BillingAddress @embedded {
+  street: String @db(name: "StreetAddress")
+  city: String @db(name: "City")
+  state: String @db(name: "State")
+  zip: String @db(name: "Zip")
+  country: String @db(name: "Country")
+}
+
+type CardStripeDetails @embedded {
+  cardID: String!
+  setupIntentID: String
+}
+
+type PaymentCard @db(name: "billing_payment_card") {
+  _id: ID! @id
+  company: Company! @relation(link: INLINE)
+  _company: Int @db(name: "Company")
+  holder: String! @db(name: "Holder")
+  currency: String! @db(name: "Currency")
+  address: BillingAddress
+  status: String! @db(name: "CardStatus")
+  stripe: CardStripeDetails
+}
+
+type BillingProductPricing @embedded {
+  currency: String!
+  stripePriceId: String!
+  description: String
+  price: Int
+}
+
+type BillingProduct {
+  _id: ID
+  id: ID! @id(strategy:NONE)
+  name: String!
+  description: String
+  stripeProductId: String
+  prices: [BillingProductPricing!]!
+  fulfilment: Json
+}
+
+enum PromoValueUnit {
+  PERCENTAGE,
+  FIXED
+}
+
+enum CouponType {
+  EVENT,
+  SUBSCRIPTION,
+  TOPUP,
+  GENERAL
+}
+
+type BillingCoupon {
+  _id: ID! @id
+  id: ID
+  name: String!
+  description: String
+  stripeCouponId: String
+  stripeProductIds: [String!]
+  promoCode: String!
+  value: Float!
+  unit: PromoValueUnit!
+  companyId: String
+  eventId: String
+  type: CouponType
+
+  
+  # Conditions
+  onlyTheseCompanies: [Company!] @relation(name: "CouponPermittedCompany", link: INLINE)
+  onlyTheseUsers: [User!] @relation(name: "CouponPermittedUser", link: INLINE)
+
+  oneUsePerCompany: Boolean!
+  oneUsePerUser: Boolean!
+
+  couponUsage: String @default(value: "once")
+  isReferral: Boolean
+
+  startDate: DateTime!
+  endDate: DateTime
+
+  maximumUses: Int
+  currentUses: Int
+  usedByUser: [User!] @relation(name: "CouponUsedByUser", link: INLINE)
+  usedByCompanyMembership: [CompanyMembership!] @relation(name: "CouponUsedByCompanyMembership", link: INLINE)
+
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+# ------------------------------------------------------------------------------------------------
+# ---------------------------------------- COMMUNITY ---------------------------------------------
+
+type CommunityQuestion {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  checkedAt: DateTime # Approve or Reject date
+  status: String!
+  statusDescription: String
+  postedBy: User! @relation(name: "UserPostedCommunityQuestions", link: INLINE)
+  checkedBy: User @relation(name: "UserCheckedCommunityQuestions", link: INLINE)
+  likedBy: [User!]! @relation(name: "UserLikesCommunityQuestions", link: INLINE)
+  views: Int!
+  replies: [CommunityReply!]! @relation(name: "RepliesToCommunityQuestions", onDelete: SET_NULL)
+  topic: String!
+  title: String!
+  keywords: String
+  returningAnswer: String!
+  order: Int @default(value: 1000)
+  hyperlink: String
+}
+
+type CommunityReply {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  checkedAt: DateTime # Approve or Reject date
+  status: String!
+  postedBy: User! @relation(name: "UserPostedCommunityReply", link: INLINE)
+  checkedBy: User @relation(name: "UserCheckedCommunityReply", link: INLINE)
+  answer: String!
+  question: CommunityQuestion! @relation(name: "RepliesToCommunityQuestions", link: INLINE)
+  likedBy: [User!]! @relation(name: "UserLikesCommunitiesReplies", link: INLINE)
+  dislikedBy: [User!]! @relation(name: "UserDislikesCommunitiesReplies", link: INLINE)
+  reportedBy: [User!]! @relation(name: "UserReportsCommunituesReplies", link: INLINE)
+  rates: [CommunityReplyRate!]! @relation(name: "CommunityReplyGetsRate")
+  hyperlink: String
+}
+
+type CommunityReplyRate {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  postedBy: User! @relation(name: "UserRatedOnCommunityReply", link: INLINE)
+  reply: CommunityReply! @relation(name: "CommunityReplyGetsRate", link: INLINE, onDelete: SET_NULL)
+  rate: Int!
+}
+
+type SupportQuestion {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  postedBy: User! @relation(name: "UserPostedSupportQuestions", link: INLINE)
+  likedBy: [User!]! @relation(name: "UserLikesSupportQuestions", link: INLINE)
+  views: Int!
+  replies: [SupportReply!]! @relation(name: "RepliesToSupportQuestions", onDelete: SET_NULL)
+  topic: String!
+  title: String!
+  keywords: String
+  returningAnswer: String!
+  order: Int @default(value: 1000)
+  hyperlink: String
+}
+
+type SupportReply {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  checkedAt: DateTime # Approve or Reject date
+  status: String!
+  postedBy: User! @relation(name: "UserPostedSupportReply", link: INLINE)
+  checkedBy: User @relation(name: "UserCheckedSupportReply", link: INLINE)
+  answer: String!
+  question: SupportQuestion! @relation(name: "RepliesToSupportQuestions", link: INLINE)
+  likedBy: [User!]! @relation(name: "UserLikesSupportsReplies", link: INLINE)
+  dislikedBy: [User!]! @relation(name: "UserDislikesSupportsReplies", link: INLINE)
+  rates: [SupportReplyRate!]! @relation(name: "SupportReplyGetsRate")
+  hyperlink: String
+}
+
+type SupportReplyRate {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  postedBy: User! @relation(name: "UserRatedOnSupportReply", link: INLINE)
+  reply: SupportReply! @relation(name: "SupportReplyGetsRate", link: INLINE, onDelete: SET_NULL)
+  rate: Int!
+}
+type CommunityCategory {
+  _id: ID! @id
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  title: String! @unique
+}
+
+type CommunityRejectionResult {
+  _id: ID! @id
+  title: String!
+  description: String!
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+enum CommunityNotificationType {
+  NEW_SUPPORT_QUESTION,
+  NEW_SUPPORT_REPLY,
+  NEW_HUB_QUESTION,
+  NEW_HUB_REPLY,
+}
+
+type CommunityNotification {
+  _id: ID! @id
+  type: CommunityNotificationType!
+  title: String!
+  targetId: String!
+  receiver: User! @relation(name: "UserReceivedNotification", link: INLINE)
+  isSeen: Boolean! @default(value: true)
+  createdAt: DateTime! @createdAt
+  seenAt: DateTime
+}
+
+# -------------------------------------- Marketplace ---------------------------------------------
+
+type MarketplaceArticle {
+  _id: ID! @id
+  title: String!
+  imageAddress: String!
+  price: Int
+  currency: String @default(value: "GBP")
+  description: String!
+  keywords: String
+  postedBy: User! @relation(name:"UserPostedMarketplaceArticle", link: INLINE)
+  comments: [MarketplaceComment!]! @relation(name: "CommentsToMarketplaceArticle", onDelete: SET_NULL)
+  pagePreviews: [MarketplaceArticlePagePreview!]! @relation(name: "MarketplaceArticleGetsPagePreviews", onDelete: SET_NULL)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+type MarketplaceComment {
+  _id: ID! @id
+  text: String!
+  rateNumber: Int!
+  postedBy: User! @relation(name: "UserPostedMarketplaceComment", link: INLINE)
+  article: MarketplaceArticle! @relation(name: "CommentsToMarketplaceArticle", link: INLINE)
+  likedBy: [User!]! @relation(name: "UserLikesMarketplaceComments", link: INLINE)
+  dislikedBy: [User!]! @relation(name: "UserDislikesMarketplaceComments", link: INLINE)
+  reportedBy: [User!]! @relation(name: "UserReportsMarketplaceComments", link: INLINE)
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+type MarketplaceArticlePagePreview {
+  _id: ID! @id
+  imageAddress: String!
+  isDesktopSize: Boolean!
+  article: MarketplaceArticle! @relation(name: "MarketplaceArticleGetsPagePreviews", link: INLINE)
+  createdAt: DateTime! @createdAt
+}
+
+enum PaymentStatus {
+  UNPAID,
+  FAILED,
+  PAID
+}
+
+type MarketplaceCart {
+  _id: ID! @id
+  items: [MarketplaceCartItem!]! @relation(name: "MarketplaceCartGetItems", onDelete: SET_NULL)
+  postedByUser: User! @relation(name: "UserCreatedMarketplaceCart", link: INLINE)
+  postedByCompany: Company! @relation(name: "CompanyCreatedMarketplaceCart", link: INLINE)
+  status: PaymentStatus! @default(value: UNPAID)
+  subtotal: Int!
+  taxTotal: Int!
+  totalPrice: Int!
+  currency: String! @default(value: "GBP")
+  paymentDate: DateTime
+  createdAt: DateTime! @createdAt
+}
+
+type MarketplaceCartItem {
+  _id: ID! @id
+  article: MarketplaceArticle! @relation(name: "MarketplaceCartGetArticle", link: INLINE)
+  title: String!
+  itemCount: Int!
+  price: Int!
+  tax: Int!
+  currency: String! @default(value: "GBP")
+  cart: MarketplaceCart! @relation(name: "MarketplaceCartGetItems", link: INLINE)
+  createdAt: DateTime! @createdAt
+}
+
+
+# ------------------------------------------------------------------------------------------------
+# -------------------------------------- RESEARCH -----------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+enum ResearchStatus {
+  DRAFT,
+  LIVE,
+  ARCHIVED
+}
+
+type LegacyResearch @db(name: "research") {
+  _id: ID! @id
+  _campaign: Int @db(name: "Campaign")
+}
+
+type Research {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  language: String!
+  name: String!
+  status: ResearchStatus! @default(value: DRAFT)
+  questions: [ResearchQuestion!]! @relation(link: INLINE)
+  campaign: Campaign @relation(link: INLINE)
+
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+  createdByUser: User @relation(link: INLINE, name: "ResearchUserCreated")
+  archiveDate: DateTime
+  canvasId: String
+}
+
+type ResearchQuestion {
+  _id: ID! @id  
+  active: Boolean!
+  answerRequired: Boolean!
+  goToQuestion: ResearchQuestion @relation(link: INLINE)
+  order: Int!
+  question: String!
+  randomiseAnswers: Boolean!
+  shortCaption: String!
+  textAreaHeight: Int!
+  type: String!
+  answers: [ResearchAnswer!]! @relation(link: INLINE, name: "ResearchQuestionToAnswer")
+  answersGoingToHere: [ResearchAnswer!]! @relation(name: "ResearchAnswerGoToQuestion")
+}
+
+type ResearchAnswer {
+  _id: ID! @id
+  answer: String!
+  shortCaption: String!
+  order: Int!
+  question: ResearchQuestion @relation(name: "ResearchQuestionToAnswer")
+  goToQuestion: ResearchQuestion @relation(link: INLINE, name: "ResearchAnswerGoToQuestion")
+  isCorrect: Boolean!
+}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- CODES ------------------------------------------------------
+
+type Code @db(name: "code") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  id_number: Int
+  _idRaw: ID
+  _campaign: Int @db(name: "Campaign")
+  name: String @db(name: "Name")
+  defaultURL: String @db(name: "DefaultURL")
+  status: Int @db(name: "Status")
+  targetingType: Int @db(name: "TargetingType")
+  createdByUser: String @db(name: "CreatedByUser")
+
+  createdAt : DateTime @createdAt @db(name: "CreatedAt")
+  updatedAt: DateTime @updatedAt @db(name: "UpdatedAt")
+  archiveDate : DateTime @db(name: "ArchiveDate")
+}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- MEDIA ------------------------------------------------------
+
+type MediaFlight @db(name: "media_flights") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  id_number: Int
+  _campaign: Int @db(name: "Campaign")
+  publisherSite: String @db(name: "PublisherSite")
+  zone: String @db(name: "Zone")
+  startDate: DateTime @db(name: "Start")
+  endDate: DateTime @db(name: "End")
+  country: String @db(name: "Country")
+  format: String @db(name: "Format")
+  formatSize: String @db(name: "FormatSize")
+  placement: String @db(name: "Placement")
+  currency: String @db(name: "Currency")
+  name: String @db(name: "Name")
+  status: Int @db(name: "Status")
+  publisherPaid: Boolean @db(name: "PublisherPaid")
+  createdByStudio: Boolean @db(name: "CreatedByStudio")
+  studioId: String @db(name: "StudioId")
+  createdAt: DateTime @createdAt @db(name: "CreatedAt")
+  updatedAt: DateTime @updatedAt @db(name: "UpdatedAt")
+  archiveDate: DateTime @db(name: "ArchiveDate")
+  linkedCreatives: [String!] @db(name: "LinkedCreatives")
+  createdByUser: User @relation(link: INLINE, name: "MediaFlightUserCreated")
+  updatedByUser: User @relation(link: INLINE, name: "MediaFlightUserUpdated")
+
+  # Frequency
+  frequencyCap: Int @db(name: "FrequencyCap")
+  frequencyLength: Int @db(name: "FrequencyLength")
+
+  # Targeting
+  targetCountry: String @db(name: "TargetCountry")
+  city: [String!] @db(name: "City")
+  operatingSystem: [String!] @db(name: "OS")
+  device: String @db(name: "Device")
+
+  # Budget
+  budgetClient: Int @db(name: "BudgetClient")
+
+  # MSL targeting
+  gender: [UserGender]
+  minAge: Int
+  maxAge: Int
+}
+
+# Still not all value
+type MediaCreative @db(name: "media_creative") {
+  _id: ID! @id(strategy:NONE)
+  campaign: Int @db(name: "Campaign")
+  type: Int @db(name: "Type")
+  format: String @db(name: "Format")
+  name: String @db(name: "Name")
+  scriptTags: String @db(name: "ScriptTags")
+}
+
+type MediaTag @db(name: "media_tag") {
+  _id: ID! @id(strategy:NONE)
+  rotationalTag: Boolean @db(name: "RotationalTag")
+  campaign: Int @db(name: "Campaign")
+  flight: MediaFlight @db(name: "Flight") @relation(link: INLINE, name: "MediaFlightTag")
+  creative: MediaCreative @db(name: "Creative") @relation(link: INLINE, name: "MediaCreativeTag")
+  zone: String @db(name: "Zone")
+}
+
+type MediaVerticalPublishers {
+  _id: ID! @id
+  vertical: String!
+  publisherSite: PublisherSite @relation(link: INLINE)
+  approvedBy: User @relation(link: INLINE)
+
+  createdAt: DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- MAILING ------------------------------------------------------
+
+type MailBatch @db(name: "mail_batch") {
+  _id: ID!
+  id: ID! @id(strategy:NONE)
+  id_number: Int
+  name: String! @db(name: "Name")
+  status: Int! @db(name: "Status")
+  _campaign: Int @db(name: "Campaign")
+}
+
+# ------------------------------------------------------------------------------------------------
+# ----------------------------- PERMISSIONS/ACCESS TYPES -----------------------------------------
+
+type PermissionsNew {
+  _id: ID! @id
+  employee: CompanyMembership @relation(name: "EmployeePermissions", link: INLINE)
+  group: UserGroup @relation(name: "UserGroupPermissions", link: INLINE)
+  permissions: Json!
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+enum ChannelScopes {
+  CAMPAIGN,
+  FLIGHT,
+  CODE,
+  MAILING,
+  RESEARCH,
+  STUDIO
+}
+
+type ChannelPermissions {
+  _id: ID! @id
+  employee: CompanyMembership @relation(name: "EmployeeChannelPermissions", link: INLINE)
+  scope: ChannelScopes!
+  campaign: Campaign! @relation(name: "ChannelPermissionCampaign", link: INLINE)
+  item: String
+  createdAt: DateTime! @createdAt
+}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- ROUTING ------------------------------------------------------
+# TODO: configure the relation to the actual studio project / page
+type ProjectDomain {
+  id: ID! @id
+  projectID: String
+  domain: String! @unique
+}
+
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- Keywords ------------------------------------------------------
+#type KeywordCategory @embedded {
+#  slug: String!
+#  keywords: [String!] # slugs of the categorised keywords
+#}
+
+# ------------------------------------------------------------------------------------------------
+# --------------------------- NOT USING ATM ------------------------------------------------------
+
+
+
+type DemoType {
+  id: ID! @id
+}
+
+type Campaign @db(name: "campaign") {
+  _id: Int
+  id: ID! @id
+  advertiser: Int @db(name: "Advertiser") 
+  archiveMethod: Int @db(name: "ArchiveMethod")
+  bookingAmount: Int @db(name: "BookingAmount")
+  brand: Int @db(name: "Brand") 
+  budget: Int @db(name: "Budget")
+  category: Int @db(name: "Category")
+  channel: Int @db(name: "Channel")
+  channelsCreated: Int @db(name: "ChannelsCreated")
+  client: Int @db(name: "Client")
+  country: Int @db(name: "Country")
+  currency: String @db(name: "Currency")
+  end: DateTime @db(name: "End")
+  # Field type not supported: null
+  # endDate: <Unknown> @db(name: "EndDate")
+  name: String @db(name: "Name")
+  percentage: Int @db(name: "Percentage")
+  spend: Int @db(name: "Spend")
+  start: DateTime @db(name: "Start")
+  # Field type not supported: null
+  # startDate: <Unknown> @db(name: "StartDate")
+  status: Int @db(name: "Status")
+  
+  crmUsersAtCreation: Int @db(name: "CrmUsersAtCreation")
+  crmClustersAtCreation: Int @db(name: "CrmClustersAtCreation")
+  crmQuestionsAtCreation: Int @db(name: "CrmQuestionsAtCreation")
+
+  _client: Company @relation(link: INLINE, name: "CampaignClient")
+  _advertiser: Company @relation(link: INLINE, name: "CampaignAdvertiser")
+  _brand: Brand @relation(link: INLINE, name: "CampaignBrand")
+
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+  archiveDate : DateTime
+  createdByUser: User @relation(link: INLINE, name: "CampaignUserCreated")
+  updatedByUser: User @relation(link: INLINE, name: "CampaignUserUpdated")
+  idIncrement: Int
+}
+
+type CurrencyTable {
+  id: ID! @id
+  baseCurrency: String!
+  targetCurrency: String!
+  currentRate: String!
+  time: String!
+  updateTime: DateTime!
+  createdAt : DateTime @createdAt
+  updatedAt: DateTime @updatedAt
+}
+
+type Balance {
+  id: ID! @id
+  companyId: String!
+  company_Id: Int!
+  balanceType: BalanceType!
+  package: BillingProduct @relation(link: INLINE)
+  services: [Service]
+  createdAt: DateTime! @createdAt
+  updatedAt: DateTime! @updatedAt
+}
+
+enum BalanceType {
+  TOPUP
+  SUBSCRIPTION
+}
+
+
+type CollectionIndex @db(name: "collection_indexes") {
+  _id: ID!
+  id: ID! @id (strategy:NONE)
+
+  collection: String!
+  index: Int!
+}

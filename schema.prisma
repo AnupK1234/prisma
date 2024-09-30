@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Define the schema for MongoDB
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL") // Your MongoDB connection string
+}
+
+
+// GenericAddress embedded type
+model GenericAddress {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  country     String?
+  postcode    String?
+  town        String?
+  city        String?
+  state       String?
+  address     String?
+  addressTwo  String?
+}
+
+model CompanyProfile {
+    id          String @id @default(auto()) @map("_id") @db.ObjectId
+    locale            String
+    keywords          String[]
+    categorisedKeywords String[]
+    bio               String
+  }
+
+model EmployeeProfile {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  locale            String
+  keywords          String[]
+  categorisedKeywords String[]
+  bio               String
+}
+
+model UserProfile {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  locale            String
+  keywords          String[]
+  categorisedKeywords String[]
+  bio               String
+}
+
+model TosAcceptance {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  ip    String
+  date  Int
+}
+
+model Service {
+  id        String @id @map("_id") @default(auto()) @db.ObjectId
+  type      String
+  balance   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
