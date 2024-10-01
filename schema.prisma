@@ -361,7 +361,7 @@ model User {
   isChild              Boolean?
   walkthroughStep      Int?
   doNotShowWalkthrough Boolean?
-}
+} 
 
 // Status is an enum in Prisma.
 enum Status {
@@ -963,3 +963,20 @@ enum ClusterType {
   STRATEGY
   EVENT
 }
+
+// EventRequestInvitation Model
+model EventRequestInvitation {
+  id                    String            @id @default(cuid())
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  status                InvitationStatus  @default(AWAITING)
+  requesterId           String
+  requester             User              @relation("UserRequester", fields: [requesterId], references: [id])
+  requesterMembershipId String?
+  requesterMembership   CompanyMembership? @relation("CompanyMembershipRequester", fields: [requesterMembershipId], references: [id])
+  eventId               String
+  event                 PlatformEvent     @relation("EventRequested", fields: [eventId], references: [id])
+  lastInviteSent        DateTime?
+}
+
+
